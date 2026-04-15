@@ -23,9 +23,12 @@ type Client struct {
 	timeout       time.Duration
 	maxPacketSize int
 
-	conn   *net.UDPConn
-	closed bool
-	mu     sync.Mutex
+	conn      *net.UDPConn
+	remote    *net.UDPAddr
+	connected bool
+	ownConn   bool
+	closed    bool
+	mu        sync.Mutex
 }
 
 // NewClient creates a new A2S client for one target address.
@@ -55,6 +58,41 @@ func NewClient(addr string, opts ...Option) (*Client, error) {
 		timeout:       cfg.timeout,
 		maxPacketSize: cfg.maxPacketSize,
 		conn:          conn,
+		remote:        normalized,
+		connected:     true,
+		ownConn:       true,
+	}, nil
+}
+
+// NewClientWithConn creates a client that reuses an existing UDP socket.
+func NewClientWithConn(addr string, conn *net.UDPConn, opts ...Option) (*Client, error) {
+	if conn == nil {
+		return nil, newError(ErrorCodeDial, "new_client_with_conn", addr, "udp connection must not be nil", nil)
+	}
+
+	cfg := defaultClientConfig()
+	for _, opt := range opts {
+		if opt == nil {
+			return nil, newError(ErrorCodeAddress, "new_client_with_conn", addr, "option must not be nil", nil)
+		}
+		if err := opt(&cfg); err != nil {
+			return nil, err
+		}
+	}
+
+	normalized, err := normalizeAddress(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{
+		addr:          normalized.String(),
+		timeout:       cfg.timeout,
+		maxPacketSize: cfg.maxPacketSize,
+		conn:          conn,
+		remote:        normalized,
+		connected:     false,
+		ownConn:       false,
 	}, nil
 }
 
@@ -74,8 +112,10 @@ func (c *Client) Close() error {
 	if c.conn == nil {
 		return nil
 	}
-	if err := c.conn.Close(); err != nil {
-		return newError(ErrorCodeDial, "close", c.addr, "close udp connection failed", err)
+	if c.ownConn {
+		if err := c.conn.Close(); err != nil {
+			return newError(ErrorCodeDial, "close", c.addr, "close udp connection failed", err)
+		}
 	}
 	return nil
 }
@@ -151,11 +191,11 @@ func (c *Client) ensureUsable() error {
 }
 
 func (c *Client) doQuery(ctx context.Context, op string, request []byte, expectedHeader byte) ([]byte, error) {
-	if err := transport.Send(ctx, c.conn, request, c.deadline(ctx)); err != nil {
+	if err := c.send(ctx, request); err != nil {
 		return nil, mapTransportError(err, op, c.addr, true)
 	}
 
-	packet, err := transport.Receive(ctx, c.conn, c.maxPacketSize, c.deadline(ctx))
+	packet, err := c.receive(ctx)
 	if err != nil {
 		return nil, mapTransportError(err, op, c.addr, false)
 	}
@@ -186,10 +226,10 @@ func (c *Client) resolvePacket(ctx context.Context, op string, request []byte, p
 					return nil, mapInternalError(err, op, c.addr)
 				}
 				request = protocol.ApplyChallenge(request, token)
-				if err := transport.Send(ctx, c.conn, request, c.deadline(ctx)); err != nil {
+				if err := c.send(ctx, request); err != nil {
 					return nil, mapTransportError(err, op, c.addr, true)
 				}
-				packet, err = transport.Receive(ctx, c.conn, c.maxPacketSize, c.deadline(ctx))
+				packet, err = c.receive(ctx)
 				if err != nil {
 					return nil, mapTransportError(err, op, c.addr, false)
 				}
@@ -210,6 +250,22 @@ func (c *Client) resolvePacket(ctx context.Context, op string, request []byte, p
 			return nil, newError(ErrorCodePacketHeader, op, c.addr, "unknown packet type", nil)
 		}
 	}
+}
+
+func (c *Client) send(ctx context.Context, packet []byte) error {
+	deadline := c.deadline(ctx)
+	if c.connected {
+		return transport.Send(ctx, c.conn, packet, deadline)
+	}
+	return transport.SendTo(ctx, c.conn, c.remote, packet, deadline)
+}
+
+func (c *Client) receive(ctx context.Context) ([]byte, error) {
+	deadline := c.deadline(ctx)
+	if c.connected {
+		return transport.Receive(ctx, c.conn, c.maxPacketSize, deadline)
+	}
+	return transport.ReceiveFrom(ctx, c.conn, c.remote, c.maxPacketSize, deadline)
 }
 
 func (c *Client) deadline(ctx context.Context) time.Time {

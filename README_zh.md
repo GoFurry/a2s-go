@@ -1,29 +1,29 @@
 # a2s-go
 
-[中文文档](README_zh.md)
+[English README](README.md)
 
 ![License](https://img.shields.io/badge/License-MIT-6C757D?style=flat&color=3B82F6)
 ![Release](https://img.shields.io/github/v/release/GoFurry/a2s-go?style=flat&color=blue)
 ![Go Version](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go&logoColor=white)
 [![Go Report Card](https://goreportcard.com/badge/github.com/GoFurry/a2s-go)](https://goreportcard.com/report/github.com/GoFurry/a2s-go)
 
-`a2s-go` is a focused Go SDK for Steam/Source A2S UDP queries.
+`a2s-go` 是一个轻量、聚焦的 Go A2S UDP 查询库。
 
-It is intentionally split into three layers:
+它把能力拆成三层：
 
-- `a2s`: query a known game server with `A2S_INFO`, `A2S_PLAYER`, and `A2S_RULES`
-- `master`: discover server addresses from Valve master server pagination
-- `scanner`: turn address lists or discovery streams into batched probe results
+- `a2s`：查询单个已知服务器的 `A2S_INFO` / `A2S_PLAYER` / `A2S_RULES`
+- `master`：从 Valve master server 分页发现服务器地址
+- `scanner`：把地址列表或 discovery 流转成批量探测结果
 
-## Install
+## 安装
 
 ```bash
 go get github.com/GoFurry/a2s-go@latest
 ```
 
-## Quick Start
+## 快速开始
 
-### Query One Server
+### 查询单台服务器
 
 ```go
 package main
@@ -55,7 +55,7 @@ func main() {
 }
 ```
 
-### Discover Servers From Master
+### 从 Master 做地址发现
 
 ```go
 package main
@@ -91,9 +91,9 @@ func main() {
 }
 ```
 
-`Query` fetches one page. `Stream` keeps turning pages until discovery is done.
+`Query` 只拉一页，`Stream` 会自动翻页直到 discovery 结束。
 
-### Batch Probe Servers
+### 批量探测服务器
 
 ```go
 package main
@@ -133,22 +133,22 @@ func main() {
 }
 ```
 
-The scanner also supports:
+`scanner` 还支持：
 
 - `ProbePlayers` / `CollectPlayers`
 - `ProbeRules` / `CollectRules`
-- `master.Stream` style discovery input
+- 直接消费 `master.Stream` 风格的 discovery 输入流
 
-## Examples
+## 示例
 
 - `go run ./examples/basic`
 - `go run ./examples/master`
 - `go run ./examples/master/fake-master`
 - `go run ./examples/scanner`
 
-## References
+## 参考资料
 
-Protocol behavior follows Valve documentation first:
+协议行为优先以 Valve 官方文档为准：
 
 - [Valve Developer Wiki: Server queries](https://developer.valvesoftware.com/wiki/Server_queries#A2S_INFO)
 - [Valve Developer Wiki: Master Server Query Protocol](https://developer.valvesoftware.com/wiki/Master_Server_Query_Protocol)

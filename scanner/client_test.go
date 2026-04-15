@@ -330,6 +330,57 @@ func TestProbeRespectsConcurrencyLimit(t *testing.T) {
 	}
 }
 
+func TestProbeReusesWorkerSocketWithoutCrossTargetLeak(t *testing.T) {
+	t.Parallel()
+
+	stale := newInfoTestServer(t, infoServerBehavior{name: "Stale", delay: 80 * time.Millisecond})
+	defer stale.Close()
+	fresh := newInfoTestServer(t, infoServerBehavior{name: "Fresh", delay: 40 * time.Millisecond})
+	defer fresh.Close()
+
+	client, err := NewClient(
+		WithConcurrency(1),
+		WithTimeout(50*time.Millisecond),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	results, err := client.Collect(context.Background(), Request{
+		Servers: []master.ServerAddr{stale.ServerAddr(), fresh.ServerAddr()},
+	})
+	if err != nil {
+		t.Fatalf("Collect returned error: %v", err)
+	}
+	if got, want := len(results), 2; got != want {
+		t.Fatalf("len(results) = %d, want %d", got, want)
+	}
+
+	var timeoutCount int
+	var successNames []string
+	for _, result := range results {
+		if result.Err != nil {
+			var scannerErr *Error
+			if !errors.As(result.Err, &scannerErr) {
+				t.Fatalf("expected *Error, got %T", result.Err)
+			}
+			if scannerErr.Code != ErrorCodeTimeout {
+				t.Fatalf("scannerErr.Code = %q, want %q", scannerErr.Code, ErrorCodeTimeout)
+			}
+			timeoutCount++
+			continue
+		}
+		successNames = append(successNames, result.Info.Name)
+	}
+
+	if got, want := timeoutCount, 1; got != want {
+		t.Fatalf("timeoutCount = %d, want %d", got, want)
+	}
+	if got, want := successNames, []string{"Fresh"}; !slices.Equal(got, want) {
+		t.Fatalf("successNames = %v, want %v", got, want)
+	}
+}
+
 func TestProbeRejectsInvalidInputShape(t *testing.T) {
 	t.Parallel()
 

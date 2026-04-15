@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
@@ -135,7 +136,7 @@ func runProbe[T any](
 	c *Client,
 	ctx context.Context,
 	req Request,
-	probeOne func(context.Context, master.ServerAddr) T,
+	probeOne func(context.Context, *net.UDPConn, master.ServerAddr) T,
 	discoveryErr func(master.ServerAddr, error) T,
 ) (<-chan T, error) {
 	if c == nil {
@@ -150,13 +151,18 @@ func runProbe[T any](
 
 	var workers sync.WaitGroup
 	for i := 0; i < c.concurrency; i++ {
+		conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
+		if err != nil {
+			return nil, newError(ErrorCodeProbe, "probe", zeroServer, "open worker udp socket failed", err)
+		}
 		workers.Add(1)
-		go func() {
+		go func(workerConn *net.UDPConn) {
 			defer workers.Done()
+			defer workerConn.Close()
 			for server := range jobs {
-				results <- probeOne(ctx, server)
+				results <- probeOne(ctx, workerConn, server)
 			}
-		}()
+		}(conn)
 	}
 
 	go func() {
@@ -214,23 +220,23 @@ func feedDiscovery[T any](
 	}
 }
 
-func (c *Client) newA2SClient(server master.ServerAddr) (*a2s.Client, error) {
-	return a2s.NewClient(
+func (c *Client) newA2SClient(server master.ServerAddr, conn *net.UDPConn) (*a2s.Client, error) {
+	return a2s.NewClientWithConn(
 		server.String(),
+		conn,
 		a2s.WithTimeout(c.timeout),
 		a2s.WithMaxPacketSize(c.maxPacketSize),
 	)
 }
 
-func (c *Client) probeInfoOne(ctx context.Context, server master.ServerAddr) Result {
-	client, err := c.newA2SClient(server)
+func (c *Client) probeInfoOne(ctx context.Context, conn *net.UDPConn, server master.ServerAddr) Result {
+	client, err := c.newA2SClient(server, conn)
 	if err != nil {
 		return Result{
 			Server: cloneServer(server),
 			Err:    newError(ErrorCodeProbe, "probe", server, "create a2s client failed", err),
 		}
 	}
-	defer client.Close()
 
 	info, err := client.QueryInfo(ctx)
 	if err != nil {
@@ -245,15 +251,14 @@ func (c *Client) probeInfoOne(ctx context.Context, server master.ServerAddr) Res
 	}
 }
 
-func (c *Client) probePlayersOne(ctx context.Context, server master.ServerAddr) PlayersResult {
-	client, err := c.newA2SClient(server)
+func (c *Client) probePlayersOne(ctx context.Context, conn *net.UDPConn, server master.ServerAddr) PlayersResult {
+	client, err := c.newA2SClient(server, conn)
 	if err != nil {
 		return PlayersResult{
 			Server: cloneServer(server),
 			Err:    newError(ErrorCodeProbe, "probe_players", server, "create a2s client failed", err),
 		}
 	}
-	defer client.Close()
 
 	players, err := client.QueryPlayers(ctx)
 	if err != nil {
@@ -269,15 +274,14 @@ func (c *Client) probePlayersOne(ctx context.Context, server master.ServerAddr) 
 	}
 }
 
-func (c *Client) probeRulesOne(ctx context.Context, server master.ServerAddr) RulesResult {
-	client, err := c.newA2SClient(server)
+func (c *Client) probeRulesOne(ctx context.Context, conn *net.UDPConn, server master.ServerAddr) RulesResult {
+	client, err := c.newA2SClient(server, conn)
 	if err != nil {
 		return RulesResult{
 			Server: cloneServer(server),
 			Err:    newError(ErrorCodeProbe, "probe_rules", server, "create a2s client failed", err),
 		}
 	}
-	defer client.Close()
 
 	rules, err := client.QueryRules(ctx)
 	if err != nil {
