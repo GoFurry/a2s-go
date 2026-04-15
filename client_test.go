@@ -350,6 +350,181 @@ func TestContextTimeout(t *testing.T) {
 	}
 }
 
+func TestQueryInfoRejectsInvalidPacketHeader(t *testing.T) {
+	t.Parallel()
+
+	server := newUDPTestServer(t, func(state *udpTestState, req []byte) [][]byte {
+		if !bytes.Equal(req, buildInfoRequestBytes()) {
+			t.Fatalf("unexpected request: %v", req)
+		}
+		return [][]byte{{0x01, 0x02, 0x03}}
+	})
+	defer server.Close()
+
+	client, err := NewClient(server.Addr().String())
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+	defer client.Close()
+
+	_, err = client.QueryInfo(context.Background())
+	if err == nil {
+		t.Fatal("expected QueryInfo to fail on invalid packet header")
+	}
+	assertErrorCode(t, err, ErrorCodePacketHeader)
+}
+
+func TestQueryInfoRejectsMixedChallengeResponse(t *testing.T) {
+	t.Parallel()
+
+	var attempts int
+	server := newUDPTestServer(t, func(state *udpTestState, req []byte) [][]byte {
+		attempts++
+		switch attempts {
+		case 1:
+			if !bytes.Equal(req, buildInfoRequestBytes()) {
+				t.Fatalf("unexpected first request: %v", req)
+			}
+			return [][]byte{buildChallengeResponse(0x01020304)}
+		case 2:
+			expected := append(buildInfoRequestBytes(), []byte{0x04, 0x03, 0x02, 0x01}...)
+			if !bytes.Equal(req, expected) {
+				t.Fatalf("unexpected second request: %v", req)
+			}
+			return [][]byte{buildPlayersResponse()}
+		default:
+			t.Fatalf("unexpected request count: %d", attempts)
+			return nil
+		}
+	})
+	defer server.Close()
+
+	client, err := NewClient(server.Addr().String())
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+	defer client.Close()
+
+	_, err = client.QueryInfo(context.Background())
+	if err == nil {
+		t.Fatal("expected QueryInfo to reject mixed challenge response")
+	}
+	assertErrorCode(t, err, ErrorCodeUnsupported)
+}
+
+func TestQueryRulesRejectsInconsistentSplitPackets(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		mutate func([][]byte) [][]byte
+	}{
+		{
+			name: "id mismatch",
+			mutate: func(parts [][]byte) [][]byte {
+				out := clonePackets(parts)
+				binary.LittleEndian.PutUint32(out[1][4:8], 0x55667788)
+				return out
+			},
+		},
+		{
+			name: "total mismatch",
+			mutate: func(parts [][]byte) [][]byte {
+				out := clonePackets(parts)
+				out[1][8] = 0x03
+				return out
+			},
+		},
+		{
+			name: "split size mismatch",
+			mutate: func(parts [][]byte) [][]byte {
+				out := clonePackets(parts)
+				binary.LittleEndian.PutUint16(out[1][10:12], 0x9999)
+				return out
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			payload := buildRulesPayload()
+			parts := tt.mutate(buildSplitRulesResponses(payload, false))
+			server := newUDPTestServer(t, func(state *udpTestState, req []byte) [][]byte {
+				if !bytes.Equal(req, buildRulesRequestBytes(noChallenge)) {
+					t.Fatalf("unexpected request: %v", req)
+				}
+				return parts
+			})
+			defer server.Close()
+
+			client, err := NewClient(server.Addr().String())
+			if err != nil {
+				t.Fatalf("NewClient returned error: %v", err)
+			}
+			defer client.Close()
+
+			_, err = client.QueryRules(context.Background())
+			if err == nil {
+				t.Fatal("expected QueryRules to reject inconsistent split packets")
+			}
+			assertErrorCode(t, err, ErrorCodeMultiPacket)
+		})
+	}
+}
+
+func TestQueryRulesRejectsOversizedCompressedPayload(t *testing.T) {
+	t.Parallel()
+
+	payload := buildRulesPayload()
+	parts := buildSplitRulesResponses(buildCompressedRulesPayloadWithDeclaredSize(payload, 16*1024*1024), true)
+	server := newUDPTestServer(t, func(state *udpTestState, req []byte) [][]byte {
+		if !bytes.Equal(req, buildRulesRequestBytes(noChallenge)) {
+			t.Fatalf("unexpected request: %v", req)
+		}
+		return parts
+	})
+	defer server.Close()
+
+	client, err := NewClient(server.Addr().String())
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+	defer client.Close()
+
+	_, err = client.QueryRules(context.Background())
+	if err == nil {
+		t.Fatal("expected QueryRules to reject oversized compressed payload")
+	}
+	assertErrorCode(t, err, ErrorCodeMultiPacket)
+}
+
+func TestQueryPlayersRejectsTruncatedPayload(t *testing.T) {
+	t.Parallel()
+
+	server := newUDPTestServer(t, func(state *udpTestState, req []byte) [][]byte {
+		if !bytes.Equal(req, buildPlayersRequestBytes(noChallenge)) {
+			t.Fatalf("unexpected request: %v", req)
+		}
+		return [][]byte{buildTruncatedPlayersResponse()}
+	})
+	defer server.Close()
+
+	client, err := NewClient(server.Addr().String())
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+	defer client.Close()
+
+	_, err = client.QueryPlayers(context.Background())
+	if err == nil {
+		t.Fatal("expected QueryPlayers to reject truncated payload")
+	}
+	assertErrorCode(t, err, ErrorCodeDecode)
+}
+
 type udpTestState struct {
 	mu       sync.Mutex
 	requests [][]byte
@@ -590,6 +765,20 @@ func buildCompressedRulesPayload(payload []byte) []byte {
 	return out
 }
 
+func buildCompressedRulesPayloadWithDeclaredSize(payload []byte, declaredSize uint32) []byte {
+	compressed := mustBzip2Compress()
+	out := make([]byte, 8+len(compressed))
+	binary.LittleEndian.PutUint32(out[:4], declaredSize)
+	binary.LittleEndian.PutUint32(out[4:8], crc32.ChecksumIEEE(payload))
+	copy(out[8:], compressed)
+	return out
+}
+
+func buildTruncatedPlayersResponse() []byte {
+	full := buildPlayersResponse()
+	return slices.Clone(full[:len(full)-2])
+}
+
 func splitPayload(payload []byte, parts int) [][]byte {
 	step := (len(payload) + parts - 1) / parts
 	out := make([][]byte, 0, parts)
@@ -601,6 +790,26 @@ func splitPayload(payload []byte, parts int) [][]byte {
 		out = append(out, slices.Clone(payload[start:end]))
 	}
 	return out
+}
+
+func clonePackets(parts [][]byte) [][]byte {
+	out := make([][]byte, 0, len(parts))
+	for _, part := range parts {
+		out = append(out, slices.Clone(part))
+	}
+	return out
+}
+
+func assertErrorCode(t *testing.T, err error, want ErrorCode) {
+	t.Helper()
+
+	var a2sErr *Error
+	if !errors.As(err, &a2sErr) {
+		t.Fatalf("expected *Error, got %T", err)
+	}
+	if got := a2sErr.Code; got != want {
+		t.Fatalf("error.Code = %q, want %q", got, want)
+	}
 }
 
 func writeCString(buf *bytes.Buffer, value string) {

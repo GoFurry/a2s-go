@@ -1,87 +1,35 @@
 # a2s-go Roadmap
 
-## 网络适配说明（2026-04）
+`a2s-go` 当前已经完成了三层基础能力：
 
-- `a2s-go` 当前仍以直连 UDP 为主，不内建代理能力
-- 如果后续为中国地区网络环境补代理支持，优先评估 `SOCKS5 UDP ASSOCIATE`、自定义 `Dialer`、`PacketConn` 或本地 relay
-- 不计划把普通 HTTP 代理直接当作 A2S/Discovery 的通用代理方案
-- 当前阶段暂不内建代理池轮转，先把单服查询、Discovery、后续 Probe 这些核心链路做稳
+- 根包 `a2s`：单服 `A2S_INFO` / `A2S_PLAYER` / `A2S_RULES`
+- 子包 `master`：地址发现
+- 子包 `scanner`：批量 `A2S_INFO` / `A2S_PLAYER` / `A2S_RULES`
 
-## 当前状态
+这份 roadmap 只保留后续仍值得继续改进的内容。
 
-当前仓库已经完成的基线是：
+## 近期优先级
 
-- 单地址 `Client`
-- `QueryInfo`
-- `QueryPlayers`
-- `QueryRules`
-- challenge 自动处理
-- split packet / 压缩包处理
-- example、CI、自动化测试
+- 补一轮真实服务器兼容性样本，覆盖更多 Source 游戏和边缘返回包
+- 继续扩大异常输入样本库，把真实线上抓到的异常包沉淀成固定回归测试
+- 增加更丰富的手动测试基线，特别是 fake master、fake A2S server 和 discovery + probe 串联场景
 
-这意味着 `a2s-go` 已经具备“稳定查询单台已知服务器”的能力。
+## 性能与工程化
 
-## 下一阶段：Master/Discovery
+- 评估 `scanner` 的连接复用策略，减少大批量短生命周期 `a2s.Client` 带来的 UDP dial/close 开销
+- 评估 `scanner` 在大批量结果场景下的背压和内存占用，必要时补限流或统计接口
+- 评估解码与多包拼装路径中的临时分配，优先优化高频热点而不是提前做复杂抽象
+- 逐步补充 metrics / profiling 基线，先看真实瓶颈再决定是否深入优化
 
-下一阶段的目标是把 `a2s-go` 从“单服查询库”推进到“可发现服务器”。
+## 网络适配
 
-这一阶段只做：
-
-- `master/discovery`
-- 从 Valve Master Server 拉服务器地址列表
-- 单页查询与连续流式查询
-- region / filter / cursor 的公开契约
-
-这一阶段明确不做：
-
-- 高并发扫描
-- worker pool
-- 结果聚合
-- 去重存储
-- 分布式扫描
-
-对应文档：
-
-- [Master/Discovery 架构设计](docs/master-architecture.md)
-- [Master/Discovery 接口契约](docs/master-api-contract.md)
-
-## 下一个阶段目标：Scanner/Probe
-
-在 discovery 稳定后，下一阶段目标是补 `scanner/probe`，用于对大量服务器做高并发探测。
-
-这一层的定位是：
-
-- 消费 `master/discovery` 输出的地址流
-- 控制并发度
-- 调用现有 `a2s.Client` 或共享底层探测器
-- 输出批量 `QueryInfo` / `QueryPlayers` / `QueryRules` 结果
-
-这一阶段预计会解决：
-
-- worker pool
-- 并发上限
-- 按需查询类型选择
-- 背压
-- 结果流式输出
-- 批量超时与失败隔离
-
-这一阶段暂时不在当前轮次设计公开契约，等 discovery 落地后再单独建文档。
+- 当前仍保持直连 UDP 为主，不内建代理能力
+- 如果后续为中国地区网络环境补代理支持，优先评估 `SOCKS5 UDP ASSOCIATE`、自定义 `Dialer`、`net.PacketConn` 或本地 relay
+- 不计划把普通 HTTP 代理直接当作 A2S / Discovery / Probe 的通用代理方案
+- 暂不内建代理池轮转，等核心链路和真实网络诉求稳定后再决定
 
 ## 更后面的方向
 
-在 `scanner/probe` 之后，可以考虑：
-
 - Master filter helper
-- 更丰富的手动测试基线
-- 真实服务器兼容性样本集
-- 更细的 metrics / profiling
-- 可选的扫描结果导出格式
-
-## 一句话总结
-
-`a2s-go` 的演进顺序建议是：
-
-1. 单服查询稳定
-2. Master/Discovery 完成
-3. Scanner/Probe 完成
-4. 再考虑外围工程化和批量能力增强
+- 更完整的兼容性文档
+- 更细的使用示例与接入指南

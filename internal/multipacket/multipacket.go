@@ -6,7 +6,9 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"hash/crc32"
+	"io"
 	"net"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 )
 
 const compressedFlag = 0x80000000
+const maxDecompressedPayloadSize = 2 * 1024 * 1024
 
 type header struct {
 	ID         uint32
@@ -32,6 +35,7 @@ func Collect(ctx context.Context, conn *net.UDPConn, first []byte, maxPacketSize
 	if err != nil {
 		return nil, err
 	}
+	expected := *h
 	parts := make([]*header, int(h.Total))
 	received := 0
 	totalSize := 0
@@ -56,6 +60,9 @@ func Collect(ctx context.Context, conn *net.UDPConn, first []byte, maxPacketSize
 		}
 		h, err = parseHeader(packet)
 		if err != nil {
+			return nil, err
+		}
+		if err := validateCompatible(&expected, h); err != nil {
 			return nil, err
 		}
 	}
@@ -85,6 +92,19 @@ func Collect(ctx context.Context, conn *net.UDPConn, first []byte, maxPacketSize
 		return nil, errors.Join(ierrors.ErrMultiPacket, errors.New("checksum mismatch"))
 	}
 	return decompressed, nil
+}
+
+func validateCompatible(expected *header, actual *header) error {
+	switch {
+	case actual.ID != expected.ID:
+		return errors.Join(ierrors.ErrMultiPacket, errors.New("packet id mismatch"))
+	case actual.Total != expected.Total:
+		return errors.Join(ierrors.ErrMultiPacket, errors.New("packet total mismatch"))
+	case actual.SplitSize != expected.SplitSize:
+		return errors.Join(ierrors.ErrMultiPacket, errors.New("packet split size mismatch"))
+	default:
+		return nil
+	}
 }
 
 func parseHeader(packet []byte) (*header, error) {
@@ -124,13 +144,20 @@ func parseHeader(packet []byte) (*header, error) {
 }
 
 func readBzip2(payload []byte, size int) ([]byte, error) {
-	reader := bzip2.NewReader(bytes.NewReader(payload))
-	var out bytes.Buffer
-	if _, err := out.ReadFrom(reader); err != nil {
+	if size < 0 {
+		return nil, errors.New("invalid decompressed size")
+	}
+	if size > maxDecompressedPayloadSize {
+		return nil, fmt.Errorf("declared decompressed size %d exceeds limit %d", size, maxDecompressedPayloadSize)
+	}
+
+	reader := io.LimitReader(bzip2.NewReader(bytes.NewReader(payload)), int64(size)+1)
+	out, err := io.ReadAll(reader)
+	if err != nil {
 		return nil, err
 	}
-	if out.Len() != size {
+	if len(out) != size {
 		return nil, errors.New("decompressed size mismatch")
 	}
-	return out.Bytes(), nil
+	return out, nil
 }
