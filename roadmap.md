@@ -1,5 +1,12 @@
 # a2s-go Roadmap
 
+## 网络适配说明（2026-04）
+
+- `a2s-go` 当前仍以直连 UDP 为主，不内建代理能力
+- 如果后续为中国地区网络环境补代理支持，优先评估 `SOCKS5 UDP ASSOCIATE`、自定义 `Dialer`、`PacketConn` 或本地 relay
+- 不计划把普通 HTTP 代理直接当作 A2S/Discovery 的通用代理方案
+- 当前阶段暂不内建代理池轮转，先把单服查询、Discovery、后续 Probe 这些核心链路做稳
+
 ## 当前状态
 
 当前仓库已经完成的基线是：
