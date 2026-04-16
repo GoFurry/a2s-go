@@ -4,8 +4,16 @@
 
 - `go test ./...`
 - `go test -race ./...`
+- `go test -bench BenchmarkCollect -benchmem ./internal/multipacket`
+- `go test -bench BenchmarkReadBzip2 -benchmem ./internal/multipacket`
 - `go test -bench BenchmarkCollectInfo -benchmem ./scanner`
 - `go test -bench BenchmarkAcquireReleaseReadBuffer -benchmem ./internal/transport`
+
+Benchmark regressions should be compared against [benchmark-baseline.md](benchmark-baseline.md). Investigate before release when:
+
+- `internal/multipacket` latency regresses by more than 15%
+- `scanner` latency regresses by more than 20%
+- allocation counts increase by more than 10% in any tracked benchmark
 
 ## Manual Live Regression
 
