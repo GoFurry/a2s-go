@@ -30,7 +30,7 @@ type header struct {
 }
 
 // Collect reads and assembles a split packet response.
-func Collect(ctx context.Context, conn *net.UDPConn, first []byte, maxPacketSize int, deadline time.Time) ([]byte, error) {
+func Collect(ctx context.Context, conn *net.UDPConn, expectedSource *net.UDPAddr, first []byte, maxPacketSize int, deadline time.Time) ([]byte, error) {
 	h, err := parseHeader(first)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func Collect(ctx context.Context, conn *net.UDPConn, first []byte, maxPacketSize
 			break
 		}
 
-		packet, err := transport.Receive(ctx, conn, maxPacketSize, deadline)
+		packet, err := receiveNext(ctx, conn, expectedSource, maxPacketSize, deadline)
 		if err != nil {
 			return nil, err
 		}
@@ -92,6 +92,13 @@ func Collect(ctx context.Context, conn *net.UDPConn, first []byte, maxPacketSize
 		return nil, errors.Join(ierrors.ErrMultiPacket, errors.New("checksum mismatch"))
 	}
 	return decompressed, nil
+}
+
+func receiveNext(ctx context.Context, conn *net.UDPConn, expectedSource *net.UDPAddr, maxPacketSize int, deadline time.Time) ([]byte, error) {
+	if expectedSource == nil {
+		return transport.Receive(ctx, conn, maxPacketSize, deadline)
+	}
+	return transport.ReceiveFrom(ctx, conn, expectedSource, maxPacketSize, deadline)
 }
 
 func validateCompatible(expected *header, actual *header) error {

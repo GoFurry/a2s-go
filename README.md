@@ -102,7 +102,6 @@ import (
 	"context"
 	"log"
 
-	"github.com/GoFurry/a2s-go/master"
 	"github.com/GoFurry/a2s-go/scanner"
 )
 
@@ -114,10 +113,16 @@ func main() {
 		log.Fatal(err)
 	}
 
+	servers, err := scanner.ParseAddresses([]string{
+		"127.0.0.1:27015",
+		"127.0.0.2", // defaults to 27015
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	results, err := client.CollectInfo(context.Background(), scanner.Request{
-		Servers: []master.ServerAddr{
-			{IP: []byte{127, 0, 0, 1}, Port: 27015},
-		},
+		Servers: servers,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -135,16 +140,37 @@ func main() {
 
 The scanner also supports:
 
+- direct `[]string` address input via `scanner.Request{Addresses: ...}`
+- explicit address normalization via `scanner.ParseAddress(...)` / `scanner.ParseAddresses(...)`
 - `ProbePlayers` / `CollectPlayers`
 - `ProbeRules` / `CollectRules`
 - `master.Stream` style discovery input
 
+Scanner input rules:
+
+- exactly one of `Addresses`, `Servers`, or `Discovery` must be non-nil
+- `Addresses` accepts `host:port` or `host` and defaults missing ports to `27015`
+- empty `Addresses` / `Servers` lists are valid and produce zero probe results
+- scanner currently supports IPv4 targets only
+
 ## Examples
 
 - `go run ./examples/basic`
+- `go run ./examples/live-regression -servers=1.2.3.4:27015,5.6.7.8`
 - `go run ./examples/master`
 - `go run ./examples/master/fake-master`
 - `go run ./examples/scanner`
+
+## Manual Regression
+
+For release-time live validation, use the manual regression example:
+
+```bash
+go run ./examples/live-regression -servers=1.2.3.4:27015,5.6.7.8 -mode=all -scanner=true
+```
+
+It runs single-server probes first, then verifies the same targets through `scanner`.
+See [release-checklist.md](release-checklist.md) for the recommended release gate.
 
 ## References
 

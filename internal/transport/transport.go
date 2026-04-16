@@ -3,8 +3,15 @@ package transport
 import (
 	"context"
 	"net"
+	"sync"
 	"time"
 )
+
+var readBufferPool = sync.Pool{
+	New: func() any {
+		return make([]byte, 0)
+	},
+}
 
 // Send writes one UDP packet with deadline handling.
 func Send(ctx context.Context, conn *net.UDPConn, packet []byte, deadline time.Time) error {
@@ -26,7 +33,8 @@ func Receive(ctx context.Context, conn *net.UDPConn, maxPacketSize int, deadline
 	if err := conn.SetReadDeadline(deadline); err != nil {
 		return nil, err
 	}
-	buf := make([]byte, maxPacketSize)
+	buf := acquireReadBuffer(maxPacketSize)
+	defer releaseReadBuffer(buf)
 	n, err := conn.Read(buf)
 	if err != nil {
 		return nil, err
@@ -54,7 +62,8 @@ func ReceiveFrom(ctx context.Context, conn *net.UDPConn, expected *net.UDPAddr, 
 		return nil, err
 	}
 
-	buf := make([]byte, maxPacketSize)
+	buf := acquireReadBuffer(maxPacketSize)
+	defer releaseReadBuffer(buf)
 	for {
 		if err := conn.SetReadDeadline(deadline); err != nil {
 			return nil, err
@@ -69,6 +78,21 @@ func ReceiveFrom(ctx context.Context, conn *net.UDPConn, expected *net.UDPAddr, 
 			return out, nil
 		}
 	}
+}
+
+func acquireReadBuffer(size int) []byte {
+	buf, _ := readBufferPool.Get().([]byte)
+	if cap(buf) < size {
+		return make([]byte, size)
+	}
+	return buf[:size]
+}
+
+func releaseReadBuffer(buf []byte) {
+	if buf == nil {
+		return
+	}
+	readBufferPool.Put(buf[:0])
 }
 
 func sameUDPAddr(left *net.UDPAddr, right *net.UDPAddr) bool {

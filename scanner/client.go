@@ -124,10 +124,18 @@ func (c *Client) CollectRules(ctx context.Context, req Request) ([]RulesResult, 
 }
 
 func validateRequest(req Request) error {
-	hasServers := req.Servers != nil
-	hasDiscovery := req.Discovery != nil
-	if hasServers == hasDiscovery {
-		return newError(ErrorCodeInput, "probe", zeroServer, "request must set exactly one input source", nil)
+	sourceCount := 0
+	if req.Addresses != nil {
+		sourceCount++
+	}
+	if req.Servers != nil {
+		sourceCount++
+	}
+	if req.Discovery != nil {
+		sourceCount++
+	}
+	if sourceCount != 1 {
+		return newError(ErrorCodeInput, "probe", zeroServer, "request must set exactly one input source: addresses, servers, or discovery", nil)
 	}
 	return nil
 }
@@ -144,6 +152,14 @@ func runProbe[T any](
 	}
 	if err := validateRequest(req); err != nil {
 		return nil, err
+	}
+	if req.Addresses != nil {
+		servers, err := ParseAddresses(req.Addresses)
+		if err != nil {
+			return nil, err
+		}
+		req.Servers = servers
+		req.Addresses = nil
 	}
 
 	results := make(chan T)

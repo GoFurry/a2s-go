@@ -46,10 +46,17 @@ func main() {
 	}
 
 	ctx := context.Background()
+	staticTargets, err := scanner.ParseAddresses([]string{
+		serverA.ServerAddr().String(),
+		serverB.ServerAddr().String(),
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	fmt.Println("== Probe fixed servers (info) ==")
 	infoResults, err := scanClient.CollectInfo(ctx, scanner.Request{
-		Servers: []master.ServerAddr{serverA.ServerAddr(), serverB.ServerAddr()},
+		Servers: staticTargets,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -65,7 +72,7 @@ func main() {
 	fmt.Println()
 	fmt.Println("== Probe fixed servers (players) ==")
 	playersResults, err := scanClient.CollectPlayers(ctx, scanner.Request{
-		Servers: []master.ServerAddr{serverA.ServerAddr(), serverB.ServerAddr()},
+		Servers: staticTargets,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -81,7 +88,7 @@ func main() {
 	fmt.Println()
 	fmt.Println("== Probe fixed servers (rules) ==")
 	rulesResults, err := scanClient.CollectRules(ctx, scanner.Request{
-		Servers: []master.ServerAddr{serverA.ServerAddr(), serverB.ServerAddr()},
+		Servers: staticTargets,
 	})
 	if err != nil {
 		log.Fatal(err)

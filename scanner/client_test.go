@@ -79,6 +79,105 @@ func TestProbeWithServers(t *testing.T) {
 	}
 }
 
+func TestProbeWithStringAddresses(t *testing.T) {
+	t.Parallel()
+
+	serverA := newInfoTestServer(t, infoServerBehavior{name: "Alpha"})
+	defer serverA.Close()
+	serverB := newInfoTestServer(t, infoServerBehavior{name: "Bravo"})
+	defer serverB.Close()
+
+	client, err := NewClient(WithConcurrency(2))
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	stream, err := client.Probe(context.Background(), Request{
+		Addresses: []string{
+			serverA.ServerAddr().String(),
+			serverB.ServerAddr().String(),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Probe returned error: %v", err)
+	}
+
+	var names []string
+	for result := range stream {
+		if result.Err != nil {
+			t.Fatalf("result.Err = %v, want nil", result.Err)
+		}
+		names = append(names, result.Info.Name)
+	}
+
+	slices.Sort(names)
+	if got, want := names, []string{"Alpha", "Bravo"}; !slices.Equal(got, want) {
+		t.Fatalf("names = %v, want %v", got, want)
+	}
+}
+
+func TestProbeWithInvalidStringAddressFailsFast(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient()
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	_, err = client.Probe(context.Background(), Request{
+		Addresses: []string{"bad:address:format"},
+	})
+	if err == nil {
+		t.Fatal("expected Probe to reject invalid string address")
+	}
+
+	var scannerErr *Error
+	if !errors.As(err, &scannerErr) {
+		t.Fatalf("expected *Error, got %T", err)
+	}
+	if got, want := scannerErr.Code, ErrorCodeInput; got != want {
+		t.Fatalf("scannerErr.Code = %q, want %q", got, want)
+	}
+}
+
+func TestProbeWithEmptyAddressesReturnsNoResults(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient()
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	results, err := client.Collect(context.Background(), Request{
+		Addresses: []string{},
+	})
+	if err != nil {
+		t.Fatalf("Collect returned error: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("len(results) = %d, want 0", len(results))
+	}
+}
+
+func TestProbeWithEmptyServersReturnsNoResults(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient()
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	results, err := client.Collect(context.Background(), Request{
+		Servers: []master.ServerAddr{},
+	})
+	if err != nil {
+		t.Fatalf("Collect returned error: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("len(results) = %d, want 0", len(results))
+	}
+}
+
 func TestCollectReturnsCompletionOrder(t *testing.T) {
 	t.Parallel()
 
@@ -400,6 +499,12 @@ func TestProbeRejectsInvalidInputShape(t *testing.T) {
 		Discovery: discovery,
 	}); err == nil {
 		t.Fatal("expected Probe to reject multiple inputs")
+	}
+	if _, err := client.Probe(context.Background(), Request{
+		Addresses: []string{"127.0.0.1:27015"},
+		Servers:   []master.ServerAddr{},
+	}); err == nil {
+		t.Fatal("expected Probe to reject multiple static input types")
 	}
 }
 

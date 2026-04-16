@@ -9,7 +9,14 @@ import (
 
 // Request describes one batch probe run.
 type Request struct {
-	Servers   []master.ServerAddr
+	// Addresses accepts host[:port] strings. Missing ports default to 27015.
+	// Exactly one of Addresses, Servers, or Discovery must be non-nil.
+	Addresses []string
+	// Servers accepts already-normalized server addresses.
+	// Exactly one of Addresses, Servers, or Discovery must be non-nil.
+	Servers []master.ServerAddr
+	// Discovery accepts a streamed master-style discovery source.
+	// Exactly one of Addresses, Servers, or Discovery must be non-nil.
 	Discovery <-chan master.Result
 }
 
