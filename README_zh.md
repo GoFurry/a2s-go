@@ -102,7 +102,6 @@ import (
 	"context"
 	"log"
 
-	"github.com/GoFurry/a2s-go/master"
 	"github.com/GoFurry/a2s-go/scanner"
 )
 
@@ -115,9 +114,7 @@ func main() {
 	}
 
 	results, err := client.CollectInfo(context.Background(), scanner.Request{
-		Servers: []master.ServerAddr{
-			{IP: []byte{127, 0, 0, 1}, Port: 27015},
-		},
+		Addresses: []string{"127.0.0.1:27015"},
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -135,6 +132,7 @@ func main() {
 
 `scanner` 还支持：
 
+- 直接通过 `scanner.Request{Addresses: ...}` 传 `[]string`
 - `ProbePlayers` / `CollectPlayers`
 - `ProbeRules` / `CollectRules`
 - 直接消费 `master.Stream` 风格的 discovery 输入流

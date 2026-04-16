@@ -9,6 +9,7 @@ import (
 
 // Request describes one batch probe run.
 type Request struct {
+	Addresses []string
 	Servers   []master.ServerAddr
 	Discovery <-chan master.Result
 }
