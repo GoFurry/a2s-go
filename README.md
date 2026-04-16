@@ -156,9 +156,21 @@ Scanner input rules:
 ## Examples
 
 - `go run ./examples/basic`
+- `go run ./examples/live-regression -servers=1.2.3.4:27015,5.6.7.8`
 - `go run ./examples/master`
 - `go run ./examples/master/fake-master`
 - `go run ./examples/scanner`
+
+## Manual Regression
+
+For release-time live validation, use the manual regression example:
+
+```bash
+go run ./examples/live-regression -servers=1.2.3.4:27015,5.6.7.8 -mode=all -scanner=true
+```
+
+It runs single-server probes first, then verifies the same targets through `scanner`.
+See [release-checklist.md](release-checklist.md) for the recommended release gate.
 
 ## References
 

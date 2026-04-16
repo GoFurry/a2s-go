@@ -9,22 +9,22 @@
 - `scanner`：批量探测、并发 worker、`master.Stream` 对接
 
 从“可发布、可用的轻量 A2S SDK”来看，当前完成度大约在 `85%` 左右。
-从“长期稳定跑真实服务器和大规模扫描”的角度看，完成度大约在 `75%~85%`。
+从“长期稳定跑真实服务器和大规模扫描”的角度看，完成度大约在 `80%~85%`。
 
 ## 2026-04-16 更新
 
-本轮已经完成 Phase 1、Phase 2 和 Phase 3 的首轮目标：
+本轮已经完成 Phase 1、Phase 2、Phase 3，并推进了 Phase 4：
 
 - Phase 1：协议正确性和网络隔离
 - Phase 2：scanner 易用性和输入 API 打磨
 - Phase 3：性能和测试基线
+- Phase 4：真实世界验证工具和 release 门槛
 
-其中 Phase 3 本轮完成了这些事情：
+其中 Phase 4 本轮完成了这些事情：
 
-1. 为 `scanner` 增加了 benchmark 基线
-2. 为 UDP 读取路径引入了 buffer pool，减少高频探测时的重复分配
-3. 为 `internal/transport`、`internal/protocol` 补了更直接的单测
-4. 增加了一个 protocol fuzz 样例，给后续模糊测试留入口
+1. 增加真实服务器手动回归示例 `examples/live-regression`
+2. 把单服探测和 scanner 批量探测放进同一条手动验证路径
+3. 新增 `release-checklist.md`，明确 release 前的自动门槛和手动检查项
 
 ## 已完成的问题
 
@@ -109,6 +109,18 @@
 
 状态：`进行中`
 
+### P4: 真实服务器兼容矩阵还需要持续积累
+
+虽然现在已经有了 live regression 示例和 release checklist，但真实世界兼容矩阵本身仍需要长期积累。
+
+还可以继续补的方向：
+
+- 老游戏或非主流服务端样本库
+- challenge / split / compressed 真实样本记录
+- release 历史里的实测记录沉淀
+
+状态：`进行中`
+
 ## 接下来的主线
 
 ### Phase 1
@@ -157,14 +169,19 @@
 
 目标：补真实世界验证。
 
-状态：`待开始`
+状态：`进行中`
+
+已完成项：
+
+1. 增加真实服务器手动回归示例
+2. 为 release 建立更清晰的质量门槛
 
 下一步：
 
-1. 增加真实服务器手动回归样例
+1. 用真实服务器目标积累兼容矩阵
 2. 验证老游戏、异常 challenge、压缩包、分包兼容性
-3. 为 release 建立更清晰的质量门槛
+3. 把 live regression 结果沉淀到 release 历史
 
 ## 一句话结论
 
-`a2s-go` 现在已经完成了协议正确性、scanner 输入 API 和第一轮性能基线建设；接下来最值得投入的方向，是更系统的 internal 覆盖和真实服务器回归。
+`a2s-go` 现在已经有了真实服务器手动回归工具和 release 检查单；接下来最值得投入的方向，是把这些工具跑在更丰富的真实服务端样本上，并持续沉淀兼容矩阵。

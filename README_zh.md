@@ -156,9 +156,21 @@ func main() {
 ## 示例
 
 - `go run ./examples/basic`
+- `go run ./examples/live-regression -servers=1.2.3.4:27015,5.6.7.8`
 - `go run ./examples/master`
 - `go run ./examples/master/fake-master`
 - `go run ./examples/scanner`
+
+## 手动回归
+
+发版前做真实服务器验证时，可以使用这个手动回归示例：
+
+```bash
+go run ./examples/live-regression -servers=1.2.3.4:27015,5.6.7.8 -mode=all -scanner=true
+```
+
+它会先跑单服探测，再用同一批目标跑 `scanner` 批量探测。
+建议的发版门槛见 [release-checklist.md](release-checklist.md)。
 
 ## 参考资料
 
