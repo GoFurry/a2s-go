@@ -8,23 +8,23 @@
 - `master`：Valve master 分页发现
 - `scanner`：批量探测、并发 worker、`master.Stream` 对接
 
-从“可发布、可用的轻量 A2S SDK”来看，当前完成度大约在 `80%~85%`。
-从“长期稳定跑真实服务器和大规模扫描”的角度看，完成度大约在 `70%~80%`。
+从“可发布、可用的轻量 A2S SDK”来看，当前完成度大约在 `85%` 左右。
+从“长期稳定跑真实服务器和大规模扫描”的角度看，完成度大约在 `75%~85%`。
 
 ## 2026-04-16 更新
 
-本轮已经完成 Phase 1 和 Phase 2：
+本轮已经完成 Phase 1、Phase 2 和 Phase 3 的首轮目标：
 
 - Phase 1：协议正确性和网络隔离
 - Phase 2：scanner 易用性和输入 API 打磨
+- Phase 3：性能和测试基线
 
-其中 Phase 2 本轮完成了这些事情：
+其中 Phase 3 本轮完成了这些事情：
 
-1. 稳定了 `scanner.Request.Addresses`
-2. 新增公开 helper：`scanner.ParseAddress(...)` / `scanner.ParseAddresses(...)`
-3. 明确了 `Addresses / Servers / Discovery` 三种输入模式的边界
-4. 为默认端口、IPv4 限制、空输入 no-op 行为补了测试
-5. 更新了 README 和示例，避免静态扫地址时必须手写 `master.ServerAddr`
+1. 为 `scanner` 增加了 benchmark 基线
+2. 为 UDP 读取路径引入了 buffer pool，减少高频探测时的重复分配
+3. 为 `internal/transport`、`internal/protocol` 补了更直接的单测
+4. 增加了一个 protocol fuzz 样例，给后续模糊测试留入口
 
 ## 已完成的问题
 
@@ -81,27 +81,33 @@
 - 已新增 `scanner.ParseAddress(...)` / `scanner.ParseAddresses(...)`
 - 已明确三种输入模式的边界和约束
 
-## 仍待处理的问题
-
 ### P2: scanner 高并发下 UDP 读取分配偏多
 
-当前 `Receive / ReceiveFrom` 每次都会按 `maxPacketSize` 分配缓冲，再复制实际负载。
+问题背景：
 
-这不会先造成错误，但在高并发批量扫描时会增加：
+- 旧实现的 `Receive / ReceiveFrom` 每次都会按 `maxPacketSize` 分配大缓冲
+- 高频本地扫描下这会放大短生命周期分配和 GC 压力
 
-- 短生命周期内存分配
-- GC 压力
-- 高频探测时的吞吐损耗
+状态：`已完成`
 
-状态：`待处理`
+处理结果：
 
-### P3: internal 层测试还不够直接
+- 已为 UDP 读取路径引入 buffer pool
+- Phase 3 benchmark 可以作为后续继续优化的基线
 
-虽然公开层测试已经覆盖了不少主路径，但 `internal/protocol`、`internal/multipacket`、`internal/transport` 目前仍主要依赖外层间接覆盖。
+## 仍待处理的问题
 
-这会导致协议边界、异常包、极端分包场景的回归信号还不够强。
+### P3: internal 层测试覆盖还不够系统
 
-状态：`待处理`
+虽然现在已经补了 `internal/transport` 和 `internal/protocol` 的直接测试，但整体 internal 层仍然不是“系统性覆盖”。
+
+还可以继续补的方向：
+
+- `internal/multipacket` 的更细粒度单测
+- 更有针对性的 fuzz corpus
+- benchmark 结果的长期追踪基线
+
+状态：`进行中`
 
 ## 接下来的主线
 
@@ -133,13 +139,19 @@
 
 目标：补性能和测试基线。
 
-状态：`待开始`
+状态：`已完成（首轮）`
 
-下一步：
+已完成项：
 
 1. 为 scanner 增加 benchmark
-2. 评估 buffer 复用或 `sync.Pool`
+2. 通过 buffer pool 降低 UDP 读取路径重复分配
 3. 补 internal 层单测和 fuzz 样例
+
+后续仍可继续：
+
+1. 为 `internal/multipacket` 增加更细 benchmark
+2. 评估更进一步的零拷贝或结果对象复用
+3. 建立 benchmark 结果记录和回归门槛
 
 ### Phase 4
 
@@ -155,4 +167,4 @@
 
 ## 一句话结论
 
-`a2s-go` 现在已经完成了协议正确性和 scanner 输入 API 的第一轮打磨；接下来最值得投入的方向，是性能基线、internal 层测试和真实服务器回归。
+`a2s-go` 现在已经完成了协议正确性、scanner 输入 API 和第一轮性能基线建设；接下来最值得投入的方向，是更系统的 internal 覆盖和真实服务器回归。
