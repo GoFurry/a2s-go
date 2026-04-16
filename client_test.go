@@ -120,6 +120,55 @@ func TestQueryInfoWithChallengeFallback(t *testing.T) {
 	}
 }
 
+func TestQueryInfoWithChallengeRefresh(t *testing.T) {
+	t.Parallel()
+
+	var attempts int
+	server := newUDPTestServer(t, func(state *udpTestState, req []byte) [][]byte {
+		attempts++
+		switch attempts {
+		case 1:
+			if !bytes.Equal(req, buildInfoRequestBytes()) {
+				t.Fatalf("unexpected first request: %v", req)
+			}
+			return [][]byte{buildChallengeResponse(0x01020304)}
+		case 2:
+			expected := append(buildInfoRequestBytes(), []byte{0x04, 0x03, 0x02, 0x01}...)
+			if !bytes.Equal(req, expected) {
+				t.Fatalf("unexpected second request: %v", req)
+			}
+			return [][]byte{buildChallengeResponse(0x0A0B0C0D)}
+		case 3:
+			expected := append(buildInfoRequestBytes(), []byte{0x0D, 0x0C, 0x0B, 0x0A}...)
+			if !bytes.Equal(req, expected) {
+				t.Fatalf("unexpected third request: %v", req)
+			}
+			if len(req) != len(expected) {
+				t.Fatalf("len(third request) = %d, want %d", len(req), len(expected))
+			}
+			return [][]byte{buildInfoResponse()}
+		default:
+			t.Fatalf("unexpected request count: %d", attempts)
+			return nil
+		}
+	})
+	defer server.Close()
+
+	client, err := NewClient(server.Addr().String())
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+	defer client.Close()
+
+	info, err := client.QueryInfo(context.Background())
+	if err != nil {
+		t.Fatalf("QueryInfo returned error: %v", err)
+	}
+	if info.Name != "Codex Test Server" {
+		t.Fatalf("info.Name = %q, want %q", info.Name, "Codex Test Server")
+	}
+}
+
 func TestQueryPlayersWithChallenge(t *testing.T) {
 	t.Parallel()
 
@@ -295,6 +344,104 @@ func TestQueryRulesWithCompressedSplitPackets(t *testing.T) {
 	}
 	if got, want := rules.Items["sv_tags"], "payload,test"; got != want {
 		t.Fatalf("rules.Items[sv_tags] = %q, want %q", got, want)
+	}
+}
+
+func TestQueryRulesIgnoresSplitPacketsFromUnexpectedSource(t *testing.T) {
+	t.Parallel()
+
+	clientConn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
+	if err != nil {
+		t.Fatalf("ListenUDP client returned error: %v", err)
+	}
+	defer clientConn.Close()
+
+	targetConn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
+	if err != nil {
+		t.Fatalf("ListenUDP target returned error: %v", err)
+	}
+	defer targetConn.Close()
+
+	noiseConn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
+	if err != nil {
+		t.Fatalf("ListenUDP noise returned error: %v", err)
+	}
+	defer noiseConn.Close()
+
+	payload := buildRulesPayload()
+	parts := buildSplitRulesResponses(payload, false)
+	rogue := slices.Clone(parts[1])
+	for i := 12; i < len(rogue); i++ {
+		rogue[i] = 0
+	}
+
+	rogueTarget := make(chan *net.UDPAddr, 1)
+	targetDone := make(chan struct{})
+	rogueDone := make(chan struct{})
+
+	go func() {
+		defer close(targetDone)
+
+		buf := make([]byte, 4096)
+		_ = targetConn.SetReadDeadline(time.Now().Add(time.Second))
+		n, remote, err := targetConn.ReadFromUDP(buf)
+		if err != nil {
+			t.Errorf("target ReadFromUDP returned error: %v", err)
+			close(rogueTarget)
+			return
+		}
+		if !bytes.Equal(buf[:n], buildRulesRequestBytes(noChallenge)) {
+			t.Errorf("unexpected request: %v", buf[:n])
+			close(rogueTarget)
+			return
+		}
+		if _, err := targetConn.WriteToUDP(parts[0], remote); err != nil {
+			t.Errorf("target WriteToUDP first part returned error: %v", err)
+			close(rogueTarget)
+			return
+		}
+		rogueTarget <- remote
+		time.Sleep(20 * time.Millisecond)
+		if _, err := targetConn.WriteToUDP(parts[1], remote); err != nil {
+			t.Errorf("target WriteToUDP second part returned error: %v", err)
+		}
+	}()
+
+	go func() {
+		defer close(rogueDone)
+
+		remote, ok := <-rogueTarget
+		if !ok || remote == nil {
+			return
+		}
+		if _, err := noiseConn.WriteToUDP(rogue, remote); err != nil {
+			t.Errorf("noise WriteToUDP returned error: %v", err)
+		}
+	}()
+
+	client, err := NewClientWithConn(targetConn.LocalAddr().String(), clientConn)
+	if err != nil {
+		t.Fatalf("NewClientWithConn returned error: %v", err)
+	}
+	defer client.Close()
+
+	rules, err := client.QueryRules(context.Background())
+	if err != nil {
+		t.Fatalf("QueryRules returned error: %v", err)
+	}
+	if got, want := rules.Items["hostname"], "Codex Rules Server"; got != want {
+		t.Fatalf("rules.Items[hostname] = %q, want %q", got, want)
+	}
+
+	select {
+	case <-targetDone:
+	case <-time.After(time.Second):
+		t.Fatal("target server did not finish")
+	}
+	select {
+	case <-rogueDone:
+	case <-time.After(time.Second):
+		t.Fatal("rogue sender did not finish")
 	}
 }
 

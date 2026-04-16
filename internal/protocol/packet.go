@@ -9,6 +9,9 @@ import (
 	ierrors "github.com/GoFurry/a2s-go/internal/errors"
 )
 
+const infoQueryString = "Source Engine Query"
+const infoRequestBaseLen = 4 + 1 + len(infoQueryString) + 1
+
 type packetBuilder struct {
 	bytes.Buffer
 }
@@ -127,7 +130,7 @@ func (r *Reader) PortBE() (uint16, bool) {
 func BuildInfoRequest() []byte {
 	var b packetBuilder
 	b.Write([]byte{0xFF, 0xFF, 0xFF, 0xFF, RequestInfo})
-	b.writeCString("Source Engine Query")
+	b.writeCString(infoQueryString)
 	return b.Bytes()
 }
 
@@ -155,6 +158,10 @@ func ApplyChallenge(request []byte, challenge uint32) []byte {
 	}
 	if request[4] == RequestInfo {
 		out := append([]byte(nil), request...)
+		if len(out) >= infoRequestBaseLen+4 {
+			binary.LittleEndian.PutUint32(out[len(out)-4:], challenge)
+			return out
+		}
 		var token [4]byte
 		binary.LittleEndian.PutUint32(token[:], challenge)
 		out = append(out, token[:]...)

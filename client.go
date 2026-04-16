@@ -240,7 +240,7 @@ func (c *Client) resolvePacket(ctx context.Context, op string, request []byte, p
 			}
 			return packet, nil
 		case protocol.PacketMulti:
-			full, err := multipacket.Collect(ctx, c.conn, packet, c.maxPacketSize, c.deadline(ctx))
+			full, err := multipacket.Collect(ctx, c.conn, c.multiPacketSource(), packet, c.maxPacketSize, c.deadline(ctx))
 			if err != nil {
 				return nil, mapInternalError(err, op, c.addr)
 			}
@@ -250,6 +250,13 @@ func (c *Client) resolvePacket(ctx context.Context, op string, request []byte, p
 			return nil, newError(ErrorCodePacketHeader, op, c.addr, "unknown packet type", nil)
 		}
 	}
+}
+
+func (c *Client) multiPacketSource() *net.UDPAddr {
+	if c == nil || c.connected {
+		return nil
+	}
+	return c.remote
 }
 
 func (c *Client) send(ctx context.Context, packet []byte) error {
