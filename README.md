@@ -113,8 +113,16 @@ func main() {
 		log.Fatal(err)
 	}
 
+	servers, err := scanner.ParseAddresses([]string{
+		"127.0.0.1:27015",
+		"127.0.0.2", // defaults to 27015
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	results, err := client.CollectInfo(context.Background(), scanner.Request{
-		Addresses: []string{"127.0.0.1:27015"},
+		Servers: servers,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -133,9 +141,17 @@ func main() {
 The scanner also supports:
 
 - direct `[]string` address input via `scanner.Request{Addresses: ...}`
+- explicit address normalization via `scanner.ParseAddress(...)` / `scanner.ParseAddresses(...)`
 - `ProbePlayers` / `CollectPlayers`
 - `ProbeRules` / `CollectRules`
 - `master.Stream` style discovery input
+
+Scanner input rules:
+
+- exactly one of `Addresses`, `Servers`, or `Discovery` must be non-nil
+- `Addresses` accepts `host:port` or `host` and defaults missing ports to `27015`
+- empty `Addresses` / `Servers` lists are valid and produce zero probe results
+- scanner currently supports IPv4 targets only
 
 ## Examples
 

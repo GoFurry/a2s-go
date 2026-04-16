@@ -140,6 +140,44 @@ func TestProbeWithInvalidStringAddressFailsFast(t *testing.T) {
 	}
 }
 
+func TestProbeWithEmptyAddressesReturnsNoResults(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient()
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	results, err := client.Collect(context.Background(), Request{
+		Addresses: []string{},
+	})
+	if err != nil {
+		t.Fatalf("Collect returned error: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("len(results) = %d, want 0", len(results))
+	}
+}
+
+func TestProbeWithEmptyServersReturnsNoResults(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient()
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	results, err := client.Collect(context.Background(), Request{
+		Servers: []master.ServerAddr{},
+	})
+	if err != nil {
+		t.Fatalf("Collect returned error: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("len(results) = %d, want 0", len(results))
+	}
+}
+
 func TestCollectReturnsCompletionOrder(t *testing.T) {
 	t.Parallel()
 

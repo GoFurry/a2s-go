@@ -113,8 +113,16 @@ func main() {
 		log.Fatal(err)
 	}
 
+	servers, err := scanner.ParseAddresses([]string{
+		"127.0.0.1:27015",
+		"127.0.0.2", // 会默认补 27015
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	results, err := client.CollectInfo(context.Background(), scanner.Request{
-		Addresses: []string{"127.0.0.1:27015"},
+		Servers: servers,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -133,9 +141,17 @@ func main() {
 `scanner` 还支持：
 
 - 直接通过 `scanner.Request{Addresses: ...}` 传 `[]string`
+- 通过 `scanner.ParseAddress(...)` / `scanner.ParseAddresses(...)` 显式做地址归一化
 - `ProbePlayers` / `CollectPlayers`
 - `ProbeRules` / `CollectRules`
 - 直接消费 `master.Stream` 风格的 discovery 输入流
+
+`scanner` 输入规则：
+
+- `Addresses`、`Servers`、`Discovery` 三者必须且只能设置一个非 `nil` 输入源
+- `Addresses` 支持 `host:port` 或 `host`，缺省端口会补成 `27015`
+- 空 `Addresses` / 空 `Servers` 也是合法输入，只是会得到 0 个探测结果
+- 当前 `scanner` 只支持 IPv4 目标
 
 ## 示例
 

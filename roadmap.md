@@ -9,38 +9,43 @@
 - `scanner`：批量探测、并发 worker、`master.Stream` 对接
 
 从“可发布、可用的轻量 A2S SDK”来看，当前完成度大约在 `80%~85%`。
-从“长期稳定跑真实服务器和大规模扫描”的角度看，完成度大约在 `65%~75%`。
+从“长期稳定跑真实服务器和大规模扫描”的角度看，完成度大约在 `70%~80%`。
 
 ## 2026-04-16 更新
 
-本轮已完成 roadmap 里的两个 P1：
+本轮已经完成 Phase 1 和 Phase 2：
 
-- 已修复 split packet 后续分包来源校验不完整的问题
-- 已修复 `A2S_INFO` 二次 challenge 刷新时 token 继续追加的问题
-- 已补两组回归测试，覆盖上述两个高优先级场景
+- Phase 1：协议正确性和网络隔离
+- Phase 2：scanner 易用性和输入 API 打磨
 
-这意味着 Phase 1 里最关键的协议正确性问题已经落地，不再只是待办。
+其中 Phase 2 本轮完成了这些事情：
 
-## 已确认的问题与状态
+1. 稳定了 `scanner.Request.Addresses`
+2. 新增公开 helper：`scanner.ParseAddress(...)` / `scanner.ParseAddresses(...)`
+3. 明确了 `Addresses / Servers / Discovery` 三种输入模式的边界
+4. 为默认端口、IPv4 限制、空输入 no-op 行为补了测试
+5. 更新了 README 和示例，避免静态扫地址时必须手写 `master.ServerAddr`
+
+## 已完成的问题
 
 ### P1: split packet 后续分包来源校验不完整
 
 问题背景：
 
 - `scanner` 复用 worker UDP socket 时，首包会校验来源地址
-- 但进入 multi-packet 组包后，旧实现没有继续绑定同一个远端来源
+- 旧实现进入 multi-packet 组包后，没有继续绑定同一个远端来源
 
 影响：
 
-- 不同目标服务器的分包在共享 socket 场景下可能串包
-- 恶意或异常来源包可能被错误拼进当前响应
+- 共享 socket 场景下可能出现分包串包
+- 异常来源包可能被错误拼进当前响应
 
 状态：`已完成`
 
 处理结果：
 
 - multi-packet 后续读包现在会继续绑定预期来源地址
-- 对 `NewClientWithConn(...)` 的共享 socket 场景补了回归测试
+- 已补共享 socket 场景的回归测试
 
 ### P1: `A2S_INFO` 二次 challenge 刷新处理不完整
 
@@ -60,6 +65,23 @@
 
 - `A2S_INFO` 请求现在会覆盖旧 challenge token，而不是无限追加
 - 已补连续 challenge 回归测试
+
+### P2: scanner 静态地址输入不够顺手
+
+问题背景：
+
+- `scanner` 之前只接受 `[]master.ServerAddr` 或 `Discovery`
+- 对“我已经有一批 `host:port` 字符串，只想直接扫”的场景不够友好
+
+状态：`已完成`
+
+处理结果：
+
+- 已支持 `scanner.Request{Addresses: []string{...}}`
+- 已新增 `scanner.ParseAddress(...)` / `scanner.ParseAddresses(...)`
+- 已明确三种输入模式的边界和约束
+
+## 仍待处理的问题
 
 ### P2: scanner 高并发下 UDP 读取分配偏多
 
@@ -81,23 +103,6 @@
 
 状态：`待处理`
 
-### P3: scanner 静态地址输入还可以继续打磨
-
-`scanner` 之前只接受：
-
-- `[]master.ServerAddr`
-- `master.Stream()` 风格的 `Discovery`
-
-现在已经新增了 `scanner.Request{Addresses: []string{...}}`，静态扫地址不再需要手写 `master.ServerAddr`。
-
-但这一块还有继续优化空间：
-
-- README 示例继续补充
-- 更明确的输入约束说明
-- 评估是否补 `ParseAddresses(...)` 一类显式 helper
-
-状态：`部分完成`
-
 ## 接下来的主线
 
 ### Phase 1
@@ -116,12 +121,12 @@
 
 目标：补 scanner 的易用性和 API 打磨。
 
-状态：`进行中`
+状态：`已完成`
 
-下一步：
+已完成项：
 
 1. 稳定 `scanner.Request.Addresses`
-2. 评估是否补 `ParseAddresses(...)` 一类 helper
+2. 新增 `ParseAddress(...)` / `ParseAddresses(...)` helper
 3. 明确 `Addresses / Servers / Discovery` 三种输入模式的边界
 
 ### Phase 3
@@ -150,4 +155,4 @@
 
 ## 一句话结论
 
-`a2s-go` 现在已经不只是一个 demo 了，Phase 1 的两个高优先级协议问题也已经完成；接下来最值得投入的方向，是 scanner 易用性、性能基线和真实服务器回归。
+`a2s-go` 现在已经完成了协议正确性和 scanner 输入 API 的第一轮打磨；接下来最值得投入的方向，是性能基线、internal 层测试和真实服务器回归。

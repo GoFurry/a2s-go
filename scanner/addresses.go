@@ -10,10 +10,14 @@ import (
 
 const defaultServerPort = 27015
 
-func parseAddresses(addrs []string) ([]master.ServerAddr, error) {
+// ParseAddresses converts host[:port] strings into scanner-ready server addresses.
+//
+// Empty slices are valid and produce an empty result. Missing ports default to 27015.
+// The scanner currently only supports IPv4 targets.
+func ParseAddresses(addrs []string) ([]master.ServerAddr, error) {
 	servers := make([]master.ServerAddr, 0, len(addrs))
 	for _, addr := range addrs {
-		server, err := parseAddress(addr)
+		server, err := ParseAddress(addr)
 		if err != nil {
 			return nil, err
 		}
@@ -22,7 +26,10 @@ func parseAddresses(addrs []string) ([]master.ServerAddr, error) {
 	return servers, nil
 }
 
-func parseAddress(addr string) (master.ServerAddr, error) {
+// ParseAddress converts one host[:port] string into a scanner-ready server address.
+//
+// Missing ports default to 27015. The scanner currently only supports IPv4 targets.
+func ParseAddress(addr string) (master.ServerAddr, error) {
 	trimmed := strings.TrimSpace(addr)
 	if trimmed == "" {
 		return zeroServer, newError(ErrorCodeInput, "parse_address", zeroServer, "address must not be empty", nil)

@@ -154,7 +154,7 @@ func runProbe[T any](
 		return nil, err
 	}
 	if req.Addresses != nil {
-		servers, err := parseAddresses(req.Addresses)
+		servers, err := ParseAddresses(req.Addresses)
 		if err != nil {
 			return nil, err
 		}
