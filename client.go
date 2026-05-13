@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoFurry/a2s-go/internal/challenge"
-	ierrors "github.com/GoFurry/a2s-go/internal/errors"
-	"github.com/GoFurry/a2s-go/internal/multipacket"
-	"github.com/GoFurry/a2s-go/internal/protocol"
-	"github.com/GoFurry/a2s-go/internal/transport"
+	"github.com/gofurry/a2s-go/internal/challenge"
+	ierrors "github.com/gofurry/a2s-go/internal/errors"
+	"github.com/gofurry/a2s-go/internal/multipacket"
+	"github.com/gofurry/a2s-go/internal/protocol"
+	"github.com/gofurry/a2s-go/internal/transport"
 )
 
 // Client queries one target server via UDP.

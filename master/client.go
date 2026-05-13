@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	ierrors "github.com/GoFurry/a2s-go/internal/errors"
-	"github.com/GoFurry/a2s-go/internal/masterprotocol"
-	"github.com/GoFurry/a2s-go/internal/transport"
+	ierrors "github.com/gofurry/a2s-go/internal/errors"
+	"github.com/gofurry/a2s-go/internal/masterprotocol"
+	"github.com/gofurry/a2s-go/internal/transport"
 )
 
 // Client queries one Valve master server over UDP.

@@ -3,9 +3,9 @@
 [English README](README.md)
 
 ![License](https://img.shields.io/badge/License-MIT-6C757D?style=flat&color=3B82F6)
-![Release](https://img.shields.io/github/v/release/GoFurry/a2s-go?style=flat&color=blue)
+![Release](https://img.shields.io/github/v/release/gofurry/a2s-go?style=flat&color=blue)
 ![Go Version](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go&logoColor=white)
-[![Go Report Card](https://goreportcard.com/badge/github.com/GoFurry/a2s-go)](https://goreportcard.com/report/github.com/GoFurry/a2s-go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/gofurry/a2s-go)](https://goreportcard.com/report/github.com/gofurry/a2s-go)
 
 `a2s-go` 是一个轻量、聚焦的 Go A2S UDP 查询库。
 
@@ -18,7 +18,7 @@
 ## 安装
 
 ```bash
-go get github.com/GoFurry/a2s-go@latest
+go get github.com/gofurry/a2s-go@latest
 ```
 
 ## 快速开始
@@ -33,7 +33,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/GoFurry/a2s-go"
+	"github.com/gofurry/a2s-go"
 )
 
 func main() {
@@ -65,7 +65,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/GoFurry/a2s-go/master"
+	"github.com/gofurry/a2s-go/master"
 )
 
 func main() {
@@ -102,7 +102,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/GoFurry/a2s-go/scanner"
+	"github.com/gofurry/a2s-go/scanner"
 )
 
 func main() {

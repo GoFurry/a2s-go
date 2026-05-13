@@ -5,7 +5,7 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/GoFurry/a2s-go/internal/masterprotocol"
+	"github.com/gofurry/a2s-go/internal/masterprotocol"
 )
 
 var zeroIPv4 = net.IPv4zero.To4()

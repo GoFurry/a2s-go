@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	ierrors "github.com/GoFurry/a2s-go/internal/errors"
+	ierrors "github.com/gofurry/a2s-go/internal/errors"
 )
 
 func TestParseHeader(t *testing.T) {

@@ -5,8 +5,8 @@ import (
 	"net"
 	"strconv"
 
-	ierrors "github.com/GoFurry/a2s-go/internal/errors"
-	"github.com/GoFurry/a2s-go/internal/protocol"
+	ierrors "github.com/gofurry/a2s-go/internal/errors"
+	"github.com/gofurry/a2s-go/internal/protocol"
 )
 
 const (

@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoFurry/a2s-go"
-	"github.com/GoFurry/a2s-go/master"
+	"github.com/gofurry/a2s-go"
+	"github.com/gofurry/a2s-go/master"
 )
 
 // Client probes batches of discovered servers.

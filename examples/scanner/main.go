@@ -10,8 +10,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/GoFurry/a2s-go/master"
-	"github.com/GoFurry/a2s-go/scanner"
+	"github.com/gofurry/a2s-go/master"
+	"github.com/gofurry/a2s-go/scanner"
 )
 
 const noChallenge = ^uint32(0)

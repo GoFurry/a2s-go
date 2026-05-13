@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/GoFurry/a2s-go"
+	"github.com/gofurry/a2s-go"
 )
 
 func main() {

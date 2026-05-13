@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/GoFurry/a2s-go/master"
+	"github.com/gofurry/a2s-go/master"
 )
 
 const defaultServerPort = 27015

@@ -6,7 +6,7 @@ import (
 	"math"
 	"net"
 
-	ierrors "github.com/GoFurry/a2s-go/internal/errors"
+	ierrors "github.com/gofurry/a2s-go/internal/errors"
 )
 
 const infoQueryString = "Source Engine Query"

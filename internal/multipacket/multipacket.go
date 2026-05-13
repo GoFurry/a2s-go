@@ -12,9 +12,9 @@ import (
 	"net"
 	"time"
 
-	ierrors "github.com/GoFurry/a2s-go/internal/errors"
-	"github.com/GoFurry/a2s-go/internal/protocol"
-	"github.com/GoFurry/a2s-go/internal/transport"
+	ierrors "github.com/gofurry/a2s-go/internal/errors"
+	"github.com/gofurry/a2s-go/internal/protocol"
+	"github.com/gofurry/a2s-go/internal/transport"
 )
 
 const compressedFlag = 0x80000000

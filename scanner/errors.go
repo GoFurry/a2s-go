@@ -3,7 +3,7 @@ package scanner
 import (
 	"fmt"
 
-	"github.com/GoFurry/a2s-go/master"
+	"github.com/gofurry/a2s-go/master"
 )
 
 // ErrorCode classifies scanner/probe failures.
